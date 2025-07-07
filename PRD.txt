@@ -1,0 +1,515 @@
+# Product Requirements Document: Metro Web Compatibility Extension
+
+## 1. Executive Summary
+
+### Problem Statement
+Our monorepo contains mobile code built with Expo and Metro bundler, where most features are organized as npm modules. When attempting to run the web version from this mobile codebase, Metro fails to resolve mobile-specific libraries or encounters web-incompatible code, causing build failures and blocking web development.
+
+### Solution Overview
+Build a Metro resolver extension that intelligently handles mobile-specific modules, provides web-compatible alternatives, gracefully handles incompatible code, and integrates with linting to provide real-time feedback about web compatibility issues.
+
+### Success Metrics
+- 90% reduction in web build failures due to mobile-specific dependencies
+- Zero manual intervention needed for common mobile-to-web compatibility issues
+- Seamless integration with existing Metro workflow
+- Real-time feedback to developers about web compatibility during development
+
+## 2. Product Goals
+
+### Primary Goals
+- **Extend Metro's Power**: Leverage Metro's existing resolver capabilities for cross-platform compatibility
+- **Automatic Resolution**: Smart detection and replacement of mobile-specific modules with web alternatives
+- **Zero Config Experience**: Work out-of-the-box with existing Expo/Metro setup
+- **Graceful Degradation**: Handle incompatible features without breaking the entire application
+
+### Secondary Goals
+- Maintain single Metro configuration for both mobile and web platforms
+- Reduce development time spent on platform-specific compatibility issues
+- Improve code quality through proactive compatibility checking
+- Preserve Metro's performance characteristics
+
+## 3. Core Features
+
+### 3.1 Metro Resolver Extension
+**Description**: Extend Metro's module resolution system to automatically handle mobile-specific packages
+
+**Requirements**:
+- **Built-in mappings database** with 100+ common mobile packages (works automatically)
+- **Pattern-based detection** for mobile-specific modules (react-native-*, expo-*, @react-native-*)
+- **Automatic mock generation** for unmappable modules
+- **Optional manual overrides** for custom packages or preferred alternatives
+- Maintain Metro's caching and performance optimizations
+
+**Zero Configuration Experience**:
+```javascript
+// Works automatically for packages like:
+import AsyncStorage from '@react-native-async-storage/async-storage'; // ✅ Auto-mapped
+import { Camera } from 'expo-camera'; // ✅ Auto-mocked
+import DeviceInfo from 'react-native-device-info'; // ✅ Auto-handled
+```
+
+### 3.2 Smart Module Mapping
+**Description**: Intelligent mapping of mobile-specific modules to web alternatives
+
+**Requirements**:
+- Built-in database of mobile → web package mappings
+- Support for custom mapping configurations
+- Version-aware compatibility checking
+- Automatic fallback to mock implementations
+
+**Examples**:
+```javascript
+// Automatic resolution
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// → Resolves to: localStorage wrapper on web
+
+import { Camera } from 'expo-camera';
+// → Resolves to: react-camera-pro on web
+
+import * as Location from 'expo-location';
+// → Resolves to: browser geolocation wrapper on web
+```
+
+### 3.3 Graceful Fallback System
+**Description**: Handle unavailable mobile features on web without crashing
+
+**Requirements**:
+- Platform detection within Metro resolver
+- Mock implementations for unsupported APIs
+- Runtime feature detection and graceful degradation
+- User-friendly error messages for unavailable features
+
+**Mock Implementation Strategy**:
+```javascript
+// Generated mock for react-native-haptics
+export const Haptics = {
+  impactAsync: () => {
+    if (navigator.vibrate) {
+      navigator.vibrate(100);
+    }
+    console.warn('Haptics not fully supported on web');
+  }
+};
+```
+
+### 3.4 Metro-Integrated Linting
+**Description**: ESLint integration that works with Metro's bundling process
+
+**Requirements**:
+- Custom ESLint rules for detecting mobile-specific code patterns
+- Integration with Metro's error reporting system
+- Real-time warnings during development server
+- Support for Metro's fast refresh
+
+**Lint Rules Examples**:
+```javascript
+// Error: Direct native module usage
+import { NativeModules } from 'react-native'; // ❌
+
+// Warning: Mobile-specific component without platform check
+import { CameraView } from 'expo-camera'; // ⚠️
+
+// Info: Consider platform-specific imports
+import { Dimensions } from 'react-native'; // ℹ️
+```
+
+### 3.5 Configuration Management
+**Description**: Simple configuration system that extends Metro's config
+
+**Requirements**:
+- Integration with existing metro.config.js
+- Override mappings for custom packages
+- Feature flags for different compatibility modes
+- Environment-specific settings
+
+## 4. Technical Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          Monorepo Structure                     │
+├─────────────────────────────────────────────────────────────────┤
+│  packages/                                                      │
+│  ├── mobile-app/          (Expo React Native)                   │
+│  ├── web-app/             (Web build target)                    │
+│  ├── shared-components/   (Cross-platform components)           │
+│  └── feature-modules/     (npm modules with features)           │
+│                                                                 │
+│  metro.config.js          (Single config for all platforms)    │
+└─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Metro Bundler (Enhanced)                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                Metro Core (Unchanged)                       │ │
+│  │  • File watching    • Caching    • Fast refresh            │ │
+│  │  • Transform pipeline           • Bundle generation        │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                    │                             │
+│                                    ▼                             │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │            Web Compatibility Extension                      │ │
+│  │                                                             │ │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │ │
+│  │  │   Enhanced      │  │   Module        │  │   Platform  │ │ │
+│  │  │   Resolver      │  │   Mapper        │  │   Detector  │ │ │
+│  │  │                 │  │                 │  │             │ │ │
+│  │  │ • Wraps Metro   │  │ • Mobile→Web    │  │ • Runtime   │ │ │
+│  │  │   resolver      │  │   mappings      │  │   detection │ │ │
+│  │  │ • Platform      │  │ • Custom maps   │  │ • Build     │ │ │
+│  │  │   detection     │  │ • Version check │  │   target    │ │ │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────┘ │ │
+│  │                                                             │ │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │ │
+│  │  │   Mock          │  │   Fallback      │  │   Lint      │ │ │
+│  │  │   Generator     │  │   Handler       │  │   Integrator│ │ │
+│  │  │                 │  │                 │  │             │ │ │
+│  │  │ • Auto-generate │  │ • Graceful      │  │ • ESLint    │ │ │
+│  │  │   web stubs     │  │   degradation   │  │   rules     │ │ │
+│  │  │ • API mocking   │  │ • Error         │  │ • Metro     │ │ │
+│  │  │ • Type safety   │  │   boundaries    │  │   warnings  │ │ │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────┘ │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Platform-Specific Builds                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐              ┌─────────────────┐            │
+│  │   Mobile Build  │              │   Web Build     │            │
+│  │                 │              │                 │            │
+│  │ • Native modules│              │ • Web-compatible│            │
+│  │ • Platform APIs │              │   alternatives  │            │
+│  │ • Expo features │              │ • Browser APIs  │            │
+│  │ • Original code │              │ • Graceful      │            │
+│  │                 │              │   fallbacks     │            │
+│  └─────────────────┘              └─────────────────┘            │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                    Development Server                       │ │
+│  │  • Hot reload for both platforms                           │ │
+│  │  • Real-time compatibility warnings                        │ │
+│  │  • Unified error reporting                                 │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 5. Metro Integration Details
+
+### 5.1 Resolver Enhancement
+**How it works with Metro:**
+- Wraps Metro's existing resolver instead of replacing it
+- Maintains all Metro optimizations (caching, watching, etc.)
+- Adds compatibility layer before Metro's resolution
+- Preserves Metro's platform-specific file resolution (.web.js, .native.js)
+
+### 5.2 Build Process Integration
+```javascript
+// Enhanced metro.config.js
+const { getDefaultConfig } = require('expo/metro-config');
+const { createWebCompatResolver } = require('metro-web-compat');
+
+const config = getDefaultConfig(__dirname);
+
+// Enhance resolver with web compatibility
+config.resolver = createWebCompatResolver(config.resolver, {
+  // Custom mappings
+  moduleMap: {
+    'react-native-camera': 'react-camera-pro',
+    'custom-native-module': './src/web-fallbacks/custom-web-module'
+  },
+  
+  // Fallback strategy
+  fallbackStrategy: 'graceful',
+  
+  // Platform detection
+  webPlatforms: ['web', 'browser'],
+  
+  // Mock generation
+  generateMocks: true
+});
+
+// Integrate linting
+config.transformer.babelTransformerPath = require.resolve('metro-web-compat/transformer');
+
+module.exports = config;
+```
+
+### 5.3 Development Experience
+**Metro Dev Server Integration:**
+- Compatibility warnings appear in Metro's terminal output
+- Web-specific errors show helpful resolution suggestions
+- Hot refresh works seamlessly for both platforms
+- Single command runs both mobile and web development servers
+
+## 6. User Experience
+
+### 6.1 Developer Workflow
+1. **Setup**: Install metro-web-compat extension via npm
+2. **Configuration**: Add one line to existing metro.config.js
+3. **Development**: Run existing `expo start` or `npx metro start`
+4. **Platform Selection**: Choose web platform from Expo dev tools
+5. **Build**: Use existing build commands for both platforms
+
+### 6.2 Error Handling Experience
+```bash
+# Metro Terminal Output
+Metro bundler ready.
+
+⚠️  [Web Compatibility] react-native-camera not available on web
+✅  [Auto-Resolved] Using react-camera-pro as web alternative
+ℹ️  [Suggestion] Consider adding Platform.OS check for better UX
+
+Bundle ready for web platform
+```
+
+## 7. Implementation Plan
+
+### Phase 1: Core Metro Extension + Mock Library (4 weeks)
+- Build Metro resolver wrapper
+- **Create 100+ pre-built mocks** for common mobile packages
+- Implement module mapping database with built-in mappings
+- **Package and test all mocks** to ensure they work correctly
+- Support for Expo SDK, React Native Community, and popular third-party packages
+
+### Phase 2: Runtime Mock Generation (2 weeks)
+- Pattern-based detection for unknown modules
+- **Automatic mock generation** for modules not in pre-built library
+- Graceful degradation system for unsupported features
+- **Mock quality validation** and error handling
+
+### Phase 3: Linting Integration (2 weeks)
+- ESLint plugin with Metro integration
+- Real-time warnings in Metro dev server
+- **Mock usage reporting** (which mocks are being used)
+- IDE integration for development feedback
+
+### Phase 4: Testing & Documentation (2 weeks)
+- **Comprehensive testing of all 100+ mocks**
+- Performance benchmarks
+- **Mock compatibility matrix** documentation
+- Usage examples and migration guides
+
+## 8. Technical Specifications
+
+### 8.1 Metro Resolver Extension API
+```javascript
+// metro-web-compat/resolver.js
+function createWebCompatResolver(baseResolver, options = {}) {
+  return (context, moduleName, platform) => {
+    // Detect if building for web
+    if (isWebPlatform(platform)) {
+      // 1. Check built-in mappings first (automatic)
+      const builtInMapping = BUILT_IN_MAPPINGS[moduleName];
+      if (builtInMapping) {
+        return baseResolver(context, builtInMapping, platform);
+      }
+      
+      // 2. Check user-defined mappings (manual override)
+      const userMapping = options.moduleMap?.[moduleName];
+      if (userMapping) {
+        return baseResolver(context, userMapping, platform);
+      }
+      
+      // 3. Auto-detect mobile-specific patterns
+      if (isMobileSpecificModule(moduleName)) {
+        const autoMock = generateAutoMock(moduleName);
+        return baseResolver(context, autoMock, platform);
+      }
+    }
+    
+    // Fallback to original Metro resolver
+    return baseResolver(context, moduleName, platform);
+  };
+}
+```
+
+### 8.2 Automatic Detection & Built-in Mappings
+```javascript
+// Built-in mappings (works automatically, no config needed)
+const BUILT_IN_MAPPINGS = {
+  '@react-native-async-storage/async-storage': 'metro-web-compat/mocks/async-storage',
+  'react-native-camera': 'react-camera-pro',
+  'expo-location': 'metro-web-compat/mocks/location',
+  'expo-haptics': 'metro-web-compat/mocks/haptics',
+  'react-native-share': 'metro-web-compat/mocks/share',
+  'expo-camera': 'metro-web-compat/mocks/camera',
+  'react-native-device-info': 'metro-web-compat/mocks/device-info'
+  // ... 100+ more built-in mappings
+};
+
+// Auto-detection patterns
+function isMobileSpecificModule(moduleName) {
+  const mobilePatterns = [
+    /^react-native-(?!web)/,  // react-native-* (except react-native-web)
+    /^expo-(?!web)/,          // expo-* (except expo-web)
+    /^@react-native-/,        // @react-native-*
+    /native-base/,            // native-base components
+    /react-navigation/        // react-navigation
+  ];
+  
+  return mobilePatterns.some(pattern => pattern.test(moduleName));
+}
+```
+
+### 8.3 Mock Generation
+```javascript
+// Auto-generated mock example
+// metro-web-compat/mocks/async-storage.js
+const AsyncStorage = {
+  getItem: (key) => Promise.resolve(localStorage.getItem(key)),
+  setItem: (key, value) => Promise.resolve(localStorage.setItem(key, value)),
+  removeItem: (key) => Promise.resolve(localStorage.removeItem(key)),
+  clear: () => Promise.resolve(localStorage.clear())
+};
+
+export default AsyncStorage;
+```
+
+## 9. Success Criteria
+
+### Technical Success
+- **Build Success Rate**: 95%+ successful web builds from mobile codebase
+- **Performance**: <5% Metro build time increase
+- **Compatibility**: Support for 100+ common mobile-specific packages
+- **Metro Integration**: Zero conflicts with existing Metro features
+
+### Developer Experience Success
+- **Setup Time**: <5 minutes (single line config change)
+- **Learning Curve**: No additional learning required
+- **Workflow**: Existing Expo/Metro commands work unchanged
+
+### Business Success
+- **Development Velocity**: 40% faster cross-platform feature delivery
+- **Code Reuse**: 80%+ code sharing between mobile and web
+- **Team Efficiency**: Single Metro configuration for all platforms
+
+## 10. Risks and Mitigation
+
+### Technical Risks
+- **Risk**: Metro API changes breaking compatibility
+- **Mitigation**: Pin to specific Metro versions, maintain compatibility matrix
+
+- **Risk**: Performance degradation from additional resolution logic
+- **Mitigation**: Intelligent caching, lazy loading of mappings
+
+### Adoption Risks
+- **Risk**: Team hesitant to modify Metro configuration
+- **Mitigation**: Minimal configuration changes, backward compatibility
+
+## 11. Future Enhancements
+
+### Phase 2 Features
+- **Visual Diff Tool**: Compare mobile vs web UI automatically
+- **Performance Monitoring**: Track web performance impact
+- **Advanced Mocking**: AI-powered mock generation
+- **Multi-platform**: Support for desktop, TV platforms
+
+### Metro Ecosystem Integration
+- **Metro Plugin System**: Official Metro plugin when available
+- **Expo Integration**: Built-in Expo SDK compatibility
+- **Community Mappings**: Crowdsourced package mappings
+
+## 12. Configuration Examples
+
+### 12.1 Zero Configuration (Recommended)
+```javascript
+// metro.config.js - Works automatically for 100+ common packages
+const { getDefaultConfig } = require('expo/metro-config');
+const { createWebCompatResolver } = require('metro-web-compat');
+
+const config = getDefaultConfig(__dirname);
+config.resolver = createWebCompatResolver(config.resolver);
+
+module.exports = config;
+
+// That's it! No manual module mapping needed for common packages
+```
+
+### 12.2 Manual Overrides (Optional)
+```javascript
+// metro.config.js - Only when you need custom mappings
+const config = getDefaultConfig(__dirname);
+
+config.resolver = createWebCompatResolver(config.resolver, {
+  // Only specify custom mappings for packages not in built-in database
+  moduleMap: {
+    'my-custom-native-module': './src/web-alternatives/my-web-module',
+    'some-obscure-native-lib': 'web-compatible-alternative'
+  },
+  
+  // Override built-in mappings if needed
+  overrides: {
+    'expo-camera': 'my-preferred-camera-lib' // Override default mapping
+  }
+});
+```
+
+## 13. Package Structure & Mock Library
+
+### 13.1 NPM Package Contents
+```
+metro-web-compat/
+├── package.json
+├── resolver.js                 # Main Metro resolver extension
+├── transformer.js              # Babel transformer for linting
+├── mocks/                      # Pre-built mocks for 100+ packages
+│   ├── async-storage.js
+│   ├── camera.js
+│   ├── location.js
+│   ├── haptics.js
+│   ├── device-info.js
+│   ├── share.js
+│   ├── clipboard.js
+│   ├── file-system.js
+│   ├── permissions.js
+│   ├── notifications.js
+│   ├── contacts.js
+│   ├── calendar.js
+│   ├── image-picker.js
+│   ├── barcode-scanner.js
+│   ├── audio.js
+│   ├── video.js
+│   ├── maps.js
+│   ├── sensors.js
+│   ├── bluetooth.js
+│   ├── nfc.js
+│   └── ... (100+ more mocks)
+├── mappings/
+│   ├── built-in-mappings.js    # Database of module → mock mappings
+│   └── patterns.js             # Auto-detection patterns
+└── utils/
+    ├── platform-detector.js
+    ├── mock-generator.js       # Runtime mock generation
+    └── logger.js
+```
+
+### 13.2 Mock Quality Levels
+
+**Level 1: Full Functional Mocks (Best UX)**
+- Use actual web APIs where possible
+- Examples: Location (geolocation), Camera (WebRTC), AsyncStorage (localStorage)
+
+**Level 2: Graceful Degradation Mocks**
+- Provide limited functionality with clear messaging
+- Examples: Haptics (vibration API), Share (Web Share API fallback)
+
+**Level 3: Placeholder Mocks (Prevents Crashes)**
+- Return safe defaults, show "not available" messages
+- Examples: NFC, Bluetooth, some sensors
+
+### 13.3 Mock Development Strategy
+
+**Pre-built Priority (Ship with package):**
+1. **Expo SDK modules** (expo-camera, expo-location, etc.) - 40+ mocks
+2. **React Native Community** (@react-native-async-storage, etc.) - 30+ mocks  
+3. **Popular Third-party** (react-native-share, etc.) - 30+ mocks
+
+**Runtime Generation (For unknown modules):**
+- Pattern-based mock generation
+- Safe default implementations
+- TypeScript type preservation

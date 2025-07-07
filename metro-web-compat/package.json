@@ -1,0 +1,71 @@
+{
+  "name": "metro-web-compat",
+  "version": "1.0.0",
+  "description": "Metro resolver extension for cross-platform mobile-to-web compatibility",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/ --ext .js,.ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "metro",
+    "react-native",
+    "web",
+    "compatibility",
+    "resolver",
+    "expo",
+    "cross-platform"
+  ],
+  "author": "Metro Web Compat Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/metro-web-compat/metro-web-compat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/metro-web-compat/metro-web-compat/issues"
+  },
+  "homepage": "https://github.com/metro-web-compat/metro-web-compat#readme",
+  "files": [
+    "src/",
+    "mocks/",
+    "mappings/",
+    "utils/",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "metro": ">=0.70.0",
+    "react-native": ">=0.68.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
+    "eslint": "^8.37.0",
+    "jest": "^29.5.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./resolver": {
+      "types": "./src/resolver.d.ts",
+      "default": "./src/resolver.js"
+    },
+    "./transformer": {
+      "types": "./src/transformer.d.ts",
+      "default": "./src/transformer.js"
+    },
+    "./mocks/*": "./mocks/*"
+  }
+}
