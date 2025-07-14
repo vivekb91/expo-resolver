@@ -1,0 +1,46 @@
+{
+  "name": "react-native-web-runtime-resolver",
+  "version": "1.0.0",
+  "description": "Runtime resolver for graceful handling of React Native modules on web",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/ --ext .js,.ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "react-native",
+    "web",
+    "runtime",
+    "resolver",
+    "graceful-fallback",
+    "proxy",
+    "cross-platform"
+  ],
+  "author": "Runtime Resolver Team",
+  "license": "MIT",
+  "files": [
+    "src/",
+    "config/",
+    "fallbacks/",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "react-native": ">=0.68.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
+    "eslint": "^8.37.0",
+    "jest": "^29.5.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
