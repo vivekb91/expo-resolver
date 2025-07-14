@@ -196,12 +196,12 @@ if (originalModule && originalModule.default) {
 
 // Handle named exports
 if (originalModule && typeof originalModule === 'object') {
-  Object.keys(originalModule).forEach(key => {
+  Object.keys(originalModule).forEach(function(key) {
     if (key !== 'default') {
       const value = originalModule[key];
       if (typeof value === 'object' && value !== null) {
         // Wrap object exports
-        const wrappedExport = resolver.resolve('${moduleName}.${key}', value);
+        const wrappedExport = resolver.resolve('${moduleName}.' + key, value);
         module.exports[key] = wrappedExport;
       } else {
         // Pass through primitive exports
