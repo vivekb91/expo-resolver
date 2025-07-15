@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "demo-app",
-    "slug": "demo-app",
+    "name": "Native Features Demo",
+    "slug": "native-features-demo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,19 +12,72 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vivekb91.demo-app"
+      "bundleIdentifier": "com.vivekb91.demo-app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to demonstrate native camera functionality and test the runtime resolver.",
+        "NSLocationWhenInUseUsageDescription": "This app uses location services to demonstrate GPS functionality and test location fallbacks on web.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses location services to demonstrate GPS functionality and test location fallbacks on web.",
+        "NSMotionUsageDescription": "This app uses motion sensors to demonstrate accelerometer, gyroscope, and magnetometer functionality.",
+        "NSPhotoLibraryUsageDescription": "This app accesses the photo library to demonstrate image picker functionality.",
+        "NSMicrophoneUsageDescription": "This app may use the microphone for camera functionality testing."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "VIBRATE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
+        "READ_PHONE_STATE",
+        "SYSTEM_ALERT_WINDOW",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to demonstrate native camera functionality and test runtime resolver fallbacks."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to demonstrate GPS functionality and test location fallbacks on web.",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to demonstrate GPS functionality and test location fallbacks on web."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "notificationPermission": "Allow $(PRODUCT_NAME) to send notifications to demonstrate native notification functionality."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow $(PRODUCT_NAME) to access motion sensors to demonstrate accelerometer, gyroscope, and magnetometer functionality."
+        }
+      ]
+    ]
   }
 }
