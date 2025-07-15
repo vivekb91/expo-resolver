@@ -350,6 +350,40 @@ class FallbackManager {
 
     return methodPatterns.some(pattern => pattern.test(prop));
   }
+
+  /**
+   * Check if a fallback exists for a property
+   * @param {string} moduleName - Module name
+   * @param {string} prop - Property name
+   * @returns {boolean} - True if fallback exists
+   */
+  hasFallback(moduleName, prop) {
+    const fullPath = `${moduleName}.${prop}`;
+    return !!this.getCustomFallback(fullPath) || !!this.getBuiltInFallback(fullPath);
+  }
+
+  /**
+   * Get available fallback keys for a module
+   * @param {string} moduleName - Module name
+   * @returns {Array} - Array of fallback keys
+   */
+  getFallbackKeys(moduleName) {
+    const keys = [];
+    
+    // Get custom fallback keys
+    Object.keys(this.config.customFallbacks).forEach(key => {
+      if (key.startsWith(moduleName + '.')) {
+        keys.push(key.substring(moduleName.length + 1));
+      }
+    });
+    
+    // Get built-in fallback keys
+    if (this.builtInFallbacks[moduleName]) {
+      keys.push(...Object.keys(this.builtInFallbacks[moduleName]));
+    }
+    
+    return keys;
+  }
 }
 
 module.exports = {

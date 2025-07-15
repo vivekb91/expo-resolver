@@ -6,6 +6,55 @@
  */
 
 /**
+ * Create an event emitter proxy for missing event objects
+ */
+function createEventEmitterProxy(prop, moduleName, logger) {
+  logger.info(`Creating event emitter proxy for ${moduleName}.${prop}`);
+  
+  return new Proxy({}, {
+    get(target, eventProp) {
+      if (eventProp === 'addListener' || eventProp === 'addEventListener') {
+        return createListenerProxy(eventProp, `${moduleName}.${prop}`, logger);
+      }
+      
+      if (eventProp === 'removeListener' || eventProp === 'removeEventListener' || eventProp === 'removeAllListeners') {
+        return createRemoveListenerProxy(eventProp, `${moduleName}.${prop}`, logger);
+      }
+      
+      // Return undefined for other properties
+      logger.warn(`Property '${eventProp}' not found on ${moduleName}.${prop}`);
+      return undefined;
+    }
+  });
+}
+
+/**
+ * Create a listener proxy for event subscription
+ */
+function createListenerProxy(prop, moduleName, logger) {
+  return function(event, callback) {
+    logger.info(`[Fallback] ${moduleName}.${prop} called for event: ${event}`);
+    
+    // Return a subscription object with remove method
+    return {
+      remove: () => {
+        logger.info(`[Fallback] ${moduleName}.${prop} subscription removed for event: ${event}`);
+      }
+    };
+  };
+}
+
+/**
+ * Create a remove listener proxy
+ */
+function createRemoveListenerProxy(prop, moduleName, logger) {
+  return function(event, callback) {
+    logger.info(`[Fallback] ${moduleName}.${prop} called for event: ${event}`);
+    // No-op for remove operations
+  };
+}
+
+/**
  * Create a proxy wrapper around a module/object
  * @param {Object} target - The original module/object to wrap
  * @param {Object} options - Configuration options
@@ -50,8 +99,25 @@ function createProxyWrapper(target, options = {}) {
         return value;
       }
       
-      // Property doesn't exist - provide fallback
+      // Property doesn't exist - provide smart fallback
       logger.warn(`Property '${prop}' not found on module '${moduleName}'`);
+      
+      // Check if this looks like an event emitter pattern
+      if (prop === 'PushEvents' || prop.endsWith('Events')) {
+        return createEventEmitterProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a listener method
+      if (prop === 'addListener' || prop === 'addEventListener') {
+        return createListenerProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a remove method
+      if (prop === 'removeListener' || prop === 'removeEventListener' || prop === 'removeAllListeners') {
+        return createRemoveListenerProxy(prop, moduleName, logger);
+      }
+      
+      // Use the fallback manager for other cases
       return fallbackManager.getFallbackValue(moduleName, prop, config);
     },
 
