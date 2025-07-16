@@ -155,6 +155,56 @@ function createReactHookProxy(prop, moduleName, logger) {
 }
 
 /**
+ * Creates a safe property proxy for unknown properties that can handle nested access
+ * @param {string} moduleName - The module name
+ * @param {string} prop - The property name
+ * @param {Object} fallbackManager - The fallback manager
+ * @param {Object} logger - The logger
+ * @returns {Proxy} - Safe proxy for nested property access
+ */
+function createSafePropertyProxy(moduleName, prop, fallbackManager, logger) {
+  const fullPath = `${moduleName}.${prop}`;
+  
+  // Create a safe object that can handle nested property access
+  const safeObject = function(...args) {
+    logger.warn(`Unknown function '${prop}' called on module '${moduleName}'`);
+    return fallbackManager.getFallbackValue(moduleName, prop, {});
+  };
+  
+  return new Proxy(safeObject, {
+    get(target, nestedProp) {
+      if (nestedProp === 'toString') {
+        return () => `[SafeProxy: ${fullPath}]`;
+      }
+      
+      if (nestedProp === 'valueOf') {
+        return () => null;
+      }
+      
+      if (nestedProp === Symbol.toPrimitive) {
+        return () => null;
+      }
+      
+      // Log access to unknown nested property
+      logger.warn(`Accessing unknown property '${nestedProp}' on unknown property '${prop}' of module '${moduleName}'`);
+      
+      // Return another safe proxy for deeper nesting
+      return createSafePropertyProxy(fullPath, nestedProp, fallbackManager, logger);
+    },
+    
+    set(target, nestedProp, value) {
+      logger.warn(`Setting property '${nestedProp}' on unknown property '${prop}' of module '${moduleName}'`);
+      return true;
+    },
+    
+    apply(target, thisArg, argumentsList) {
+      logger.warn(`Calling unknown function '${prop}' on module '${moduleName}'`);
+      return fallbackManager.getFallbackValue(moduleName, prop, {});
+    }
+  });
+}
+
+/**
  * Create a proxy wrapper around a module/object
  * @param {Object} target - The original module/object to wrap
  * @param {Object} options - Configuration options
@@ -238,8 +288,8 @@ function createProxyWrapper(target, options = {}) {
         return createRemoveListenerProxy(prop, moduleName, logger);
       }
       
-      // Use the fallback manager for other cases
-      return fallbackManager.getFallbackValue(moduleName, prop, config);
+      // Use the safe property proxy for unknown properties
+      return createSafePropertyProxy(moduleName, prop, fallbackManager, logger);
     },
 
     set(obj, prop, value) {
