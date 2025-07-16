@@ -55,6 +55,106 @@ function createRemoveListenerProxy(prop, moduleName, logger) {
 }
 
 /**
+ * Create a React Context proxy with Provider and Consumer
+ */
+function createReactContextProxy(prop, moduleName, logger) {
+  logger.info(`Creating React Context proxy for ${moduleName}.${prop}`);
+  
+  const defaultValue = {
+    insets: { top: 0, bottom: 0, left: 0, right: 0 },
+    frame: { x: 0, y: 0, width: 0, height: 0 }
+  };
+  
+  return new Proxy({}, {
+    get(target, contextProp) {
+      if (contextProp === 'Provider') {
+        return createReactComponentProxy('Provider', `${moduleName}.${prop}`, logger);
+      }
+      
+      if (contextProp === 'Consumer') {
+        return function(props = {}) {
+          logger.info(`[Fallback] ${moduleName}.${prop}.Consumer called`);
+          const { children } = props;
+          
+          // Call the children function with default value
+          if (typeof children === 'function') {
+            return children(defaultValue);
+          }
+          
+          return children || null;
+        };
+      }
+      
+      if (contextProp === '_currentValue' || contextProp === '_context') {
+        return defaultValue;
+      }
+      
+      // Return undefined for other properties
+      logger.warn(`Property '${contextProp}' not found on ${moduleName}.${prop}`);
+      return undefined;
+    }
+  });
+}
+
+/**
+ * Create a React component proxy
+ */
+function createReactComponentProxy(prop, moduleName, logger) {
+  return function(props = {}) {
+    logger.info(`[Fallback] ${moduleName}.${prop} component called`);
+    
+    // For web, try to detect if React is available
+    if (typeof window !== 'undefined' && window.React) {
+      return window.React.createElement('div', 
+        { 
+          'data-fallback': `${moduleName}.${prop}`,
+          style: { display: 'contents' }
+        }, 
+        props.children
+      );
+    }
+    
+    // For React Native, try to create a basic View
+    try {
+      const { View } = require('react-native');
+      return require('react').createElement(View, props, props.children);
+    } catch (error) {
+      // If React isn't available, return a basic object
+      return { 
+        type: 'mock-component',
+        props: props,
+        children: props.children 
+      };
+    }
+  };
+}
+
+/**
+ * Create a React hook proxy
+ */
+function createReactHookProxy(prop, moduleName, logger) {
+  return function(...args) {
+    logger.info(`[Fallback] ${moduleName}.${prop} hook called`);
+    
+    // Common hook return patterns
+    if (prop.includes('SafeArea') || prop.includes('Insets')) {
+      return { top: 0, bottom: 0, left: 0, right: 0 };
+    }
+    
+    if (prop.includes('Frame') || prop.includes('Dimensions')) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    
+    if (prop.includes('State') || prop.includes('Value')) {
+      return [null, () => {}];
+    }
+    
+    // Generic fallback
+    return null;
+  };
+}
+
+/**
  * Create a proxy wrapper around a module/object
  * @param {Object} target - The original module/object to wrap
  * @param {Object} options - Configuration options
@@ -105,6 +205,27 @@ function createProxyWrapper(target, options = {}) {
       // Check if this looks like an event emitter pattern
       if (prop === 'PushEvents' || prop.endsWith('Events')) {
         return createEventEmitterProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a React Context pattern
+      if (prop.endsWith('Context') || prop === 'Context') {
+        const contextProxy = createReactContextProxy(prop, moduleName, logger);
+        return createProxyWrapper(contextProxy, {
+          moduleName: `${moduleName}.${prop}`,
+          config: config[prop] || {},
+          fallbackManager,
+          logger
+        });
+      }
+      
+      // Check if this looks like a React component pattern
+      if (prop.endsWith('Provider') || prop.endsWith('Consumer') || prop.endsWith('View') || prop.endsWith('Component')) {
+        return createReactComponentProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a React hook pattern
+      if (prop.startsWith('use') && prop.length > 3 && prop[3] === prop[3].toUpperCase()) {
+        return createReactHookProxy(prop, moduleName, logger);
       }
       
       // Check if this looks like a listener method
@@ -222,8 +343,46 @@ function createFallbackProxy(moduleName, fallbackManager, logger) {
         return () => fallbackTarget;
       }
       
-      // For any other property, return a fallback
+      // For any other property, use smart pattern detection
       logger.warn(`Accessing property '${prop}' on missing module '${moduleName}'`);
+      
+      // Check if this looks like an event emitter pattern
+      if (prop === 'PushEvents' || prop.endsWith('Events')) {
+        return createEventEmitterProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a React Context pattern
+      if (prop.endsWith('Context') || prop === 'Context') {
+        const contextProxy = createReactContextProxy(prop, moduleName, logger);
+        return createProxyWrapper(contextProxy, {
+          moduleName: `${moduleName}.${prop}`,
+          config: {},
+          fallbackManager,
+          logger
+        });
+      }
+      
+      // Check if this looks like a React component pattern
+      if (prop.endsWith('Provider') || prop.endsWith('Consumer') || prop.endsWith('View') || prop.endsWith('Component')) {
+        return createReactComponentProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a React hook pattern
+      if (prop.startsWith('use') && prop.length > 3 && prop[3] === prop[3].toUpperCase()) {
+        return createReactHookProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a listener method
+      if (prop === 'addListener' || prop === 'addEventListener') {
+        return createListenerProxy(prop, moduleName, logger);
+      }
+      
+      // Check if this looks like a remove method
+      if (prop === 'removeListener' || prop === 'removeEventListener' || prop === 'removeAllListeners') {
+        return createRemoveListenerProxy(prop, moduleName, logger);
+      }
+      
+      // Use the fallback manager for other cases
       return fallbackManager.getFallbackValue(moduleName, prop, {});
     },
 

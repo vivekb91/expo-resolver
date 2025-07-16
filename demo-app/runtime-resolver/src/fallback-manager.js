@@ -176,39 +176,6 @@ class FallbackManager {
     return config.returnValue || this.config.returnValue;
   }
 
-  /**
-   * Check if a fallback exists for a method/property
-   * @param {string} moduleName - Name of the module
-   * @param {string} prop - Property name
-   * @returns {boolean} - True if fallback exists
-   */
-  hasFallback(moduleName, prop) {
-    const fullPath = `${moduleName}.${prop}`;
-    return this.getCustomFallback(fullPath) !== null || this.getBuiltInFallback(fullPath) !== null;
-  }
-
-  /**
-   * Get fallback keys for a module
-   * @param {string} moduleName - Name of the module
-   * @returns {Array} - Array of fallback property names
-   */
-  getFallbackKeys(moduleName) {
-    const keys = [];
-    
-    // Add custom fallback keys
-    Object.keys(this.config.customFallbacks).forEach(key => {
-      if (key.startsWith(`${moduleName}.`)) {
-        keys.push(key.substring(moduleName.length + 1));
-      }
-    });
-    
-    // Add built-in fallback keys
-    if (this.builtInFallbacks[moduleName]) {
-      keys.push(...Object.keys(this.builtInFallbacks[moduleName]));
-    }
-    
-    return keys;
-  }
 
   /**
    * Create a fallback module for completely missing modules
@@ -384,6 +351,7 @@ class FallbackManager {
     
     return keys;
   }
+
 }
 
 module.exports = {

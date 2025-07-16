@@ -33,6 +33,7 @@ import * as Notifications from 'expo-notifications';
 import { Accelerometer, Gyroscope, Magnetometer } from 'expo-sensors';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets, SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 export default function App() {
   const [status, setStatus] = useState('Ready');
@@ -414,6 +415,37 @@ export default function App() {
     setStatus('Ready');
   };
 
+  // Test Safe Area Context
+  const testSafeAreaContext = () => {
+    setStatus('Testing Safe Area Context...');
+    addLog('🔲 Testing REAL SafeAreaContext functionality');
+    
+    try {
+      // Test SafeAreaInsetsContext.Consumer pattern
+      const TestConsumer = () => {
+        return (
+          <SafeAreaInsetsContext.Consumer>
+            {(insets) => {
+              addLog(`🔲 SafeAreaContext.Consumer called with insets: ${JSON.stringify(insets)}`, 'success');
+              return null;
+            }}
+          </SafeAreaInsetsContext.Consumer>
+        );
+      };
+      
+      // Test useSafeAreaInsets hook
+      const testInsets = useSafeAreaInsets();
+      addLog(`🔲 useSafeAreaInsets: ${JSON.stringify(testInsets)}`, 'success');
+      
+      addLog('🔲 SafeAreaContext test completed successfully!', 'success');
+      
+    } catch (error) {
+      addLog(`💥 SafeAreaContext error: ${error.message}`, 'error');
+    }
+    
+    setStatus('Ready');
+  };
+
   // Test All Native Features
   const testAllFeatures = async () => {
     setStatus('Testing All Native Features...');
@@ -429,6 +461,7 @@ export default function App() {
       { name: 'Clipboard', test: testClipboard },
       { name: 'Notifications', test: testNotifications },
       { name: 'Image Picker', test: testImagePicker },
+      { name: 'SafeAreaContext', test: testSafeAreaContext },
     ];
     
     for (const { name, test } of tests) {
@@ -463,9 +496,10 @@ export default function App() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Native Features Demo</Text>
-      <Text style={styles.subtitle}>With Runtime Resolver</Text>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.title}>Native Features Demo</Text>
+        <Text style={styles.subtitle}>With Runtime Resolver</Text>
       
       {/* Device Info */}
       <View style={styles.deviceInfo}>
@@ -540,6 +574,10 @@ export default function App() {
           <Text style={styles.buttonText}>🖼️ Test REAL Image Picker</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.button} onPress={testSafeAreaContext}>
+          <Text style={styles.buttonText}>🔲 Test REAL SafeAreaContext</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={testAllFeatures}>
           <Text style={[styles.buttonText, styles.primaryButtonText]}>🚀 Test ALL Native Features</Text>
         </TouchableOpacity>
@@ -563,7 +601,8 @@ export default function App() {
           ))}
         </ScrollView>
       </View>
-    </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

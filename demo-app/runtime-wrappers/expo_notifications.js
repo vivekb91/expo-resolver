@@ -1,8 +1,10 @@
 
-// Auto-generated runtime wrapper for expo-notifications
+// Auto-generated interface-based runtime wrapper for expo-notifications
 const { createRuntimeResolver } = require('../runtime-resolver/src/index');
+const { InterfaceAnalyzer } = require('../runtime-resolver/src/interface-analyzer');
+const { WrapperGenerator } = require('../runtime-resolver/src/wrapper-generator');
 
-console.log('[Runtime Wrapper] Loading wrapper for expo-notifications');
+console.log('[Interface Wrapper] Loading interface-based wrapper for expo-notifications');
 
 const resolver = createRuntimeResolver({
   logging: true,
@@ -19,29 +21,44 @@ try {
   // Wrap it with runtime resolver
   wrappedModule = resolver.resolve('expo-notifications', originalModule);
   
-  console.log('[Runtime Wrapper] Successfully wrapped expo-notifications');
-  
-  // Handle default exports
-  if (originalModule && originalModule.default) {
-    wrappedModule.default = resolver.resolve('expo-notifications', originalModule.default);
-  }
-  
-  // Handle named exports
-  if (originalModule) {
-    Object.keys(originalModule).forEach(key => {
-      if (key !== 'default' && typeof originalModule[key] === 'object') {
-        wrappedModule[key] = resolver.resolve('expo-notifications.' + key, originalModule[key]);
-      } else if (key !== 'default') {
-        wrappedModule[key] = originalModule[key];
-      }
-    });
-  }
+  console.log('[Interface Wrapper] Successfully wrapped expo-notifications');
   
 } catch (error) {
-  console.warn('[Runtime Wrapper] Failed to load expo-notifications:', error.message);
+  console.warn('[Interface Wrapper] Failed to load expo-notifications:', error.message);
   
-  // Create safe fallback
-  wrappedModule = resolver.resolve('expo-notifications', {});
+  // Use interface analysis to create intelligent fallbacks
+  const analyzer = new InterfaceAnalyzer();
+  const generator = new WrapperGenerator({
+    info: (msg) => console.log('[Interface Wrapper]', msg),
+    warn: (msg) => console.warn('[Interface Wrapper]', msg)
+  });
+  
+  try {
+    // Try interface analysis only in Node.js environment
+    if (typeof process !== 'undefined' && process.platform) {
+      // Analyze the module interface
+      const moduleInterface = analyzer.analyzeModuleInterface('expo-notifications', process.cwd());
+      
+      // Generate wrapper based on interface analysis
+      const interfaceWrapper = generator.generateWrapper(moduleInterface);
+      
+      console.log('[Interface Wrapper] Generated interface-based wrapper for expo-notifications');
+      console.log('[Interface Wrapper] Detected exports:', Object.keys(moduleInterface.exports));
+      
+      // Wrap the interface-based fallback with runtime resolver
+      wrappedModule = resolver.resolve('expo-notifications', interfaceWrapper);
+    } else {
+      // Web environment - use basic fallback
+      console.log('[Interface Wrapper] Web environment - using basic fallback for expo-notifications');
+      wrappedModule = resolver.resolve('expo-notifications', {});
+    }
+    
+  } catch (analysisError) {
+    console.warn('[Interface Wrapper] Interface analysis failed:', analysisError.message);
+    
+    // Ultimate fallback - empty object
+    wrappedModule = resolver.resolve('expo-notifications', {});
+  }
 }
 
 module.exports = wrappedModule;

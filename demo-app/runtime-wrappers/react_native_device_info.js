@@ -1,8 +1,10 @@
 
-// Auto-generated runtime wrapper for react-native-device-info
+// Auto-generated interface-based runtime wrapper for react-native-device-info
 const { createRuntimeResolver } = require('../runtime-resolver/src/index');
+const { InterfaceAnalyzer } = require('../runtime-resolver/src/interface-analyzer');
+const { WrapperGenerator } = require('../runtime-resolver/src/wrapper-generator');
 
-console.log('[Runtime Wrapper] Loading wrapper for react-native-device-info');
+console.log('[Interface Wrapper] Loading interface-based wrapper for react-native-device-info');
 
 const resolver = createRuntimeResolver({
   logging: true,
@@ -19,29 +21,44 @@ try {
   // Wrap it with runtime resolver
   wrappedModule = resolver.resolve('react-native-device-info', originalModule);
   
-  console.log('[Runtime Wrapper] Successfully wrapped react-native-device-info');
-  
-  // Handle default exports
-  if (originalModule && originalModule.default) {
-    wrappedModule.default = resolver.resolve('react-native-device-info', originalModule.default);
-  }
-  
-  // Handle named exports
-  if (originalModule) {
-    Object.keys(originalModule).forEach(key => {
-      if (key !== 'default' && typeof originalModule[key] === 'object') {
-        wrappedModule[key] = resolver.resolve('react-native-device-info.' + key, originalModule[key]);
-      } else if (key !== 'default') {
-        wrappedModule[key] = originalModule[key];
-      }
-    });
-  }
+  console.log('[Interface Wrapper] Successfully wrapped react-native-device-info');
   
 } catch (error) {
-  console.warn('[Runtime Wrapper] Failed to load react-native-device-info:', error.message);
+  console.warn('[Interface Wrapper] Failed to load react-native-device-info:', error.message);
   
-  // Create safe fallback
-  wrappedModule = resolver.resolve('react-native-device-info', {});
+  // Use interface analysis to create intelligent fallbacks
+  const analyzer = new InterfaceAnalyzer();
+  const generator = new WrapperGenerator({
+    info: (msg) => console.log('[Interface Wrapper]', msg),
+    warn: (msg) => console.warn('[Interface Wrapper]', msg)
+  });
+  
+  try {
+    // Try interface analysis only in Node.js environment
+    if (typeof process !== 'undefined' && process.platform) {
+      // Analyze the module interface
+      const moduleInterface = analyzer.analyzeModuleInterface('react-native-device-info', process.cwd());
+      
+      // Generate wrapper based on interface analysis
+      const interfaceWrapper = generator.generateWrapper(moduleInterface);
+      
+      console.log('[Interface Wrapper] Generated interface-based wrapper for react-native-device-info');
+      console.log('[Interface Wrapper] Detected exports:', Object.keys(moduleInterface.exports));
+      
+      // Wrap the interface-based fallback with runtime resolver
+      wrappedModule = resolver.resolve('react-native-device-info', interfaceWrapper);
+    } else {
+      // Web environment - use basic fallback
+      console.log('[Interface Wrapper] Web environment - using basic fallback for react-native-device-info');
+      wrappedModule = resolver.resolve('react-native-device-info', {});
+    }
+    
+  } catch (analysisError) {
+    console.warn('[Interface Wrapper] Interface analysis failed:', analysisError.message);
+    
+    // Ultimate fallback - empty object
+    wrappedModule = resolver.resolve('react-native-device-info', {});
+  }
 }
 
 module.exports = wrappedModule;
