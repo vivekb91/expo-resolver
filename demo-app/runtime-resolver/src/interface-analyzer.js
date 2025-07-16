@@ -9,7 +9,8 @@
 let nodeOps = null;
 if (typeof window === 'undefined' && typeof process !== 'undefined' && process.platform) {
   try {
-    nodeOps = require('./interface-analyzer-node');
+    // Use eval to prevent bundlers from processing this require statement
+    nodeOps = eval('require')('./interface-analyzer-node');
   } catch (error) {
     console.warn('[InterfaceAnalyzer] Node.js operations not available');
   }
