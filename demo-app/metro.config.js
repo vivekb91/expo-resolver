@@ -26,6 +26,7 @@ const AUTO_WRAP_MODULES = [
   'expo-sensors',
   'react-native-image-picker',
   'react-native-safe-area-context',
+  'react-native-screens',
 ];
 
 // Create wrapper files at startup
