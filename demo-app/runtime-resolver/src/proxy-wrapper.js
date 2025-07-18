@@ -245,6 +245,16 @@ function createProxyWrapper(target, options = {}) {
           });
         }
         
+        // CRITICAL: Handle null/undefined values that should be objects
+        // This handles cases like NetInfo.NetInfoStateType being null
+        if (value === null || value === undefined) {
+          // Check if this property is expected to be an object based on usage patterns
+          if (shouldCreateFallbackObject(prop, moduleName)) {
+            logger.warn(`Property '${prop}' is null/undefined on module '${moduleName}', creating fallback object`);
+            return createFallbackObjectProxy(`${moduleName}.${prop}`, fallbackManager, logger);
+          }
+        }
+        
         // Return primitive values as-is
         return value;
       }
@@ -447,8 +457,98 @@ function createFallbackProxy(moduleName, fallbackManager, logger) {
   });
 }
 
+/**
+ * Create a fallback object proxy for null/undefined properties that should be objects
+ * @param {string} propertyPath - Full path to the property (e.g., 'NetInfo.NetInfoStateType')
+ * @param {Object} fallbackManager - Fallback manager instance
+ * @param {Object} logger - Logger instance
+ * @returns {Proxy} - Fallback object proxy
+ */
+function createFallbackObjectProxy(propertyPath, fallbackManager, logger) {
+  const fallbackTarget = {};
+  
+  return new Proxy(fallbackTarget, {
+    get(obj, prop) {
+      if (prop === 'toString') {
+        return () => `[FallbackObject for ${propertyPath}]`;
+      }
+      
+      if (prop === 'valueOf') {
+        return () => fallbackTarget;
+      }
+      
+      // Return fallback value for any property access
+      logger.warn(`Accessing property '${prop}' on null/undefined object '${propertyPath}'`);
+      return fallbackManager.getFallbackValue(propertyPath, prop, {});
+    },
+
+    set(obj, prop, value) {
+      logger.warn(`Attempting to set property '${prop}' on fallback object '${propertyPath}'`);
+      return false;
+    },
+
+    has(obj, prop) {
+      return ['toString', 'valueOf'].includes(prop) || fallbackManager.hasFallback(propertyPath, prop);
+    },
+
+    ownKeys(obj) {
+      return fallbackManager.getFallbackKeys(propertyPath);
+    }
+  });
+}
+
+/**
+ * Determine if a null/undefined property should be treated as an object
+ * @param {string} prop - Property name
+ * @param {string} moduleName - Module name
+ * @returns {boolean} - True if should create fallback object
+ */
+function shouldCreateFallbackObject(prop, moduleName) {
+  // Common patterns that indicate a property should be an object
+  const objectPatterns = [
+    /State$/,          // NetInfoStateType
+    /Type$/,           // NetInfoStateType, ConnectionType, etc.
+    /Constants?$/,     // Constants, Constant
+    /Config$/,         // Config objects
+    /Options?$/,       // Options, Option
+    /Settings?$/,      // Settings, Setting
+    /Styles?$/,        // Styles, Style
+    /Theme$/,          // Theme objects
+    /Event$/,          // Event objects
+    /Manager$/,        // Manager objects
+    /Handler$/,        // Handler objects
+  ];
+
+  // Check if the property name matches object patterns
+  const matchesPattern = objectPatterns.some(pattern => pattern.test(prop));
+  
+  // Check for specific known cases
+  const knownObjectProperties = [
+    'NetInfoStateType',
+    'ConnectionType',
+    'NetInfoConfiguration',
+    'DeviceType',
+    'BatteryState',
+    'PowerState',
+    'MediaType',
+    'ImagePickerOptions',
+    'CameraOptions',
+    'LocationOptions',
+    'NotificationOptions',
+    'HapticFeedbackType',
+    'OrientationType',
+    'SensorType',
+    'ShareOptions',
+    'ClipboardOptions'
+  ];
+
+  return matchesPattern || knownObjectProperties.includes(prop);
+}
+
 module.exports = {
   createProxyWrapper,
   createMethodProxy,
-  createFallbackProxy
+  createFallbackProxy,
+  createFallbackObjectProxy,
+  shouldCreateFallbackObject
 };

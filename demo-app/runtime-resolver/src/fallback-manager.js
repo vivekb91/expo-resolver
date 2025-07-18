@@ -114,6 +114,86 @@ class FallbackManager {
           console.warn('Clipboard write not available on this platform');
           return Promise.resolve();
         }
+      },
+
+      // NetInfo fallbacks
+      '@react-native-community/netinfo': {
+        fetch: () => {
+          if (navigator.onLine !== undefined) {
+            return Promise.resolve({
+              type: navigator.onLine ? 'wifi' : 'none',
+              isConnected: navigator.onLine,
+              isInternetReachable: navigator.onLine,
+              details: {
+                isConnectionExpensive: false,
+                ssid: null,
+                bssid: null,
+                strength: null,
+                ipAddress: null,
+                subnet: null,
+                frequency: null
+              }
+            });
+          }
+          return Promise.resolve({
+            type: 'unknown',
+            isConnected: null,
+            isInternetReachable: null,
+            details: null
+          });
+        },
+        addEventListener: (listener) => {
+          if (typeof window !== 'undefined' && window.addEventListener) {
+            const handleOnline = () => listener({
+              type: 'wifi',
+              isConnected: true,
+              isInternetReachable: true,
+              details: { isConnectionExpensive: false }
+            });
+            const handleOffline = () => listener({
+              type: 'none',
+              isConnected: false,
+              isInternetReachable: false,
+              details: null
+            });
+            
+            window.addEventListener('online', handleOnline);
+            window.addEventListener('offline', handleOffline);
+            
+            return () => {
+              window.removeEventListener('online', handleOnline);
+              window.removeEventListener('offline', handleOffline);
+            };
+          }
+          return () => {};
+        },
+        useNetInfo: () => ({
+          type: navigator.onLine ? 'wifi' : 'none',
+          isConnected: navigator.onLine,
+          isInternetReachable: navigator.onLine,
+          details: null
+        })
+      },
+
+      // NetInfo.NetInfoStateType fallbacks
+      '@react-native-community/netinfo.NetInfoStateType': {
+        none: 'none',
+        unknown: 'unknown',
+        cellular: 'cellular',
+        wifi: 'wifi',
+        bluetooth: 'bluetooth',
+        ethernet: 'ethernet',
+        wimax: 'wimax',
+        vpn: 'vpn',
+        other: 'other'
+      },
+
+      // NetInfo.NetInfoCellularGeneration fallbacks
+      '@react-native-community/netinfo.NetInfoCellularGeneration': {
+        '2g': '2g',
+        '3g': '3g',
+        '4g': '4g',
+        '5g': '5g'
       }
     };
   }
