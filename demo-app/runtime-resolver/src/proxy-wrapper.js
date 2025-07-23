@@ -235,9 +235,12 @@ function createProxyWrapper(target, options = {}) {
           return createMethodProxy(value, prop, moduleName, config, fallbackManager, logger);
         }
         
-        // If it's an object, recursively wrap it
+        // If it's an object, recursively wrap it with web compatibility enhancements
         if (typeof value === 'object' && value !== null) {
-          return createProxyWrapper(value, {
+          // First enhance the object with missing web methods if needed
+          const enhancedValue = enhanceObjectForWeb(value, `${moduleName}.${prop}`, logger);
+          
+          return createProxyWrapper(enhancedValue, {
             moduleName: `${moduleName}.${prop}`,
             config: config[prop] || {},
             fallbackManager,
@@ -545,10 +548,175 @@ function shouldCreateFallbackObject(prop, moduleName) {
   return matchesPattern || knownObjectProperties.includes(prop);
 }
 
+/**
+ * Enhance objects with missing web-compatible methods
+ * @param {Object} obj - The object to enhance
+ * @param {string} objectPath - Full path for logging
+ * @param {Object} logger - Logger instance
+ * @returns {Object} - Enhanced object with web methods
+ */
+function enhanceObjectForWeb(obj, objectPath, logger) {
+  // Don't enhance certain object types
+  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Error || 
+      obj instanceof Promise || obj instanceof Map || obj instanceof Set ||
+      obj instanceof WeakMap || obj instanceof WeakSet || Array.isArray(obj)) {
+    return obj;
+  }
+
+  // Check if object already has the methods we need
+  const hasToString = typeof obj.toString === 'function' && obj.toString !== Object.prototype.toString;
+  const hasValueOf = typeof obj.valueOf === 'function' && obj.valueOf !== Object.prototype.valueOf;
+  const hasToPrimitive = typeof obj[Symbol.toPrimitive] === 'function';
+
+  // If object already has all necessary methods, return as-is
+  if (hasToString && hasValueOf && hasToPrimitive) {
+    return obj;
+  }
+
+  logger.debug(`Enhancing object for web compatibility: ${objectPath}`);
+
+  // Create enhanced version without mutating original
+  const enhanced = Object.create(Object.getPrototypeOf(obj));
+  
+  // Copy all original properties
+  Object.getOwnPropertyNames(obj).forEach(key => {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    if (descriptor) {
+      Object.defineProperty(enhanced, key, descriptor);
+    }
+  });
+
+  // Copy symbol properties
+  Object.getOwnPropertySymbols(obj).forEach(symbol => {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, symbol);
+    if (descriptor) {
+      Object.defineProperty(enhanced, symbol, descriptor);
+    }
+  });
+
+  // Add toString if missing or generic
+  if (!hasToString) {
+    Object.defineProperty(enhanced, 'toString', {
+      value: function() {
+        // Try common value properties for design tokens
+        if (this.value !== undefined) {
+          return String(this.value);
+        }
+        if (this.raw !== undefined) {
+          return String(this.raw);
+        }
+        if (this.hex !== undefined) {
+          return this.hex;
+        }
+        if (this.rgba !== undefined) {
+          return this.rgba;
+        }
+        if (this.rgb !== undefined) {
+          return this.rgb;
+        }
+        if (this.hsl !== undefined) {
+          return this.hsl;
+        }
+        
+        // For numeric-like objects, try common numeric properties
+        if (typeof this.number === 'number') {
+          return String(this.number);
+        }
+        if (typeof this.size === 'number') {
+          return String(this.size);
+        }
+        if (typeof this.width === 'number' || typeof this.height === 'number') {
+          return String(this.width || this.height);
+        }
+
+        // Check if object has a single primitive property
+        const keys = Object.keys(this);
+        if (keys.length === 1) {
+          const singleValue = this[keys[0]];
+          if (typeof singleValue === 'string' || typeof singleValue === 'number') {
+            return String(singleValue);
+          }
+        }
+
+        // Fallback to JSON representation for complex objects
+        try {
+          return JSON.stringify(this);
+        } catch (error) {
+          return `[Object ${objectPath}]`;
+        }
+      },
+      writable: true,
+      enumerable: false,
+      configurable: true
+    });
+  }
+
+  // Add valueOf if missing or generic
+  if (!hasValueOf) {
+    Object.defineProperty(enhanced, 'valueOf', {
+      value: function() {
+        // Try to return the actual value for design tokens
+        if (this.value !== undefined) {
+          return this.value;
+        }
+        if (this.raw !== undefined) {
+          return this.raw;
+        }
+        
+        // For numeric-like objects
+        if (typeof this.number === 'number') {
+          return this.number;
+        }
+        if (typeof this.size === 'number') {
+          return this.size;
+        }
+
+        // Check if object has a single primitive property
+        const keys = Object.keys(this);
+        if (keys.length === 1) {
+          const singleValue = this[keys[0]];
+          if (typeof singleValue === 'string' || typeof singleValue === 'number' || typeof singleValue === 'boolean') {
+            return singleValue;
+          }
+        }
+
+        // Return the object itself as fallback
+        return this;
+      },
+      writable: true,
+      enumerable: false,
+      configurable: true
+    });
+  }
+
+  // Add Symbol.toPrimitive if missing
+  if (!hasToPrimitive) {
+    Object.defineProperty(enhanced, Symbol.toPrimitive, {
+      value: function(hint) {
+        if (hint === 'string') {
+          return this.toString();
+        }
+        if (hint === 'number') {
+          const value = this.valueOf();
+          return typeof value === 'number' ? value : Number(value);
+        }
+        // Default hint
+        return this.valueOf();
+      },
+      writable: true,
+      enumerable: false,
+      configurable: true
+    });
+  }
+
+  return enhanced;
+}
+
 module.exports = {
   createProxyWrapper,
   createMethodProxy,
   createFallbackProxy,
   createFallbackObjectProxy,
-  shouldCreateFallbackObject
+  shouldCreateFallbackObject,
+  enhanceObjectForWeb
 };
