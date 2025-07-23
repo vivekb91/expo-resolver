@@ -113,15 +113,34 @@ module.exports = wrappedModule;
 // Store original resolver
 const originalResolver = config.resolver?.resolveRequest;
 
+// Native module aliases for web builds
+const NATIVE_MODULE_ALIASES = {
+  'react-native/Libraries/Utilities/codegenNativeCommands': path.join(__dirname, 'runtime-resolver/fallbacks/codegenNativeCommands.js'),
+  'react-native/Libraries/Utilities/codegenNativeComponent': path.join(__dirname, 'runtime-resolver/fallbacks/codegenNativeComponent.js'),
+  'react-native/Libraries/TurboModule/TurboModuleRegistry': path.join(__dirname, 'runtime-resolver/fallbacks/genericNativeFallback.js'),
+  'react-native/Libraries/EventEmitter/NativeEventEmitter': path.join(__dirname, 'runtime-resolver/fallbacks/genericNativeFallback.js'),
+  'react-native/Libraries/ReactNative/UIManager': path.join(__dirname, 'runtime-resolver/fallbacks/genericNativeFallback.js'),
+  'react-native/Libraries/BatchedBridge/NativeModules': path.join(__dirname, 'runtime-resolver/fallbacks/genericNativeFallback.js'),
+};
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   try {
+    // Handle native-only modules for web platform
+    const isWebPlatform = platform === 'web' || platform === 'dom';
+    if (isWebPlatform && NATIVE_MODULE_ALIASES[moduleName]) {
+      console.log(`[Metro Config] Aliasing native module ${moduleName} for web`);
+      return {
+        filePath: NATIVE_MODULE_ALIASES[moduleName],
+        type: 'sourceFile'
+      };
+    }
+    
     // First resolve normally
     const resolution = originalResolver 
       ? originalResolver(context, moduleName, platform)
       : context.resolveRequest(context, moduleName, platform);
     
     // Check if this is a web platform and module needs wrapping
-    const isWebPlatform = platform === 'web' || platform === 'dom';
     const needsWrapping = isWebPlatform && AUTO_WRAP_MODULES.includes(moduleName);
     
     if (needsWrapping) {
@@ -140,6 +159,19 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return resolution;
   } catch (error) {
     console.error(`[Metro Config] Error resolving ${moduleName}:`, error.message);
+    
+    // If normal resolution fails and it's a React Native internal module on web, try generic fallback
+    const isWebPlatform = platform === 'web' || platform === 'dom';
+    const isRNInternal = moduleName.startsWith('react-native/Libraries/') || moduleName.includes('/react-native/Libraries/');
+    
+    if (isWebPlatform && isRNInternal) {
+      console.warn(`[Metro Config] Using generic fallback for unknown RN internal module: ${moduleName}`);
+      return {
+        filePath: path.join(__dirname, 'runtime-resolver/fallbacks/genericNativeFallback.js'),
+        type: 'sourceFile'
+      };
+    }
+    
     return originalResolver 
       ? originalResolver(context, moduleName, platform)
       : context.resolveRequest(context, moduleName, platform);
