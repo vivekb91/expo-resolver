@@ -11,7 +11,7 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Modules to auto-wrap for web
+// Modules to auto-wrap for web (supports pattern matching)
 const AUTO_WRAP_MODULES = [
   'expo-camera',
   'expo-location', 
@@ -27,6 +27,7 @@ const AUTO_WRAP_MODULES = [
   'react-native-image-picker',
   'react-native-safe-area-context',
   'react-native-screens',
+  'react-native-logger', // Pattern: matches react-native-logger/dist/types too
 ];
 
 // Create wrapper files at startup
@@ -41,12 +42,13 @@ AUTO_WRAP_MODULES.forEach(moduleName => {
   const wrapperPath = path.join(wrapperDir, `${safeName}.js`);
   
   const wrapperContent = `
-// Auto-generated interface-based runtime wrapper for ${moduleName}
+// Auto-generated interface-based runtime wrapper for ${moduleName} (pattern-based)
 const { createRuntimeResolver } = require('../runtime-resolver/src/index');
 const { InterfaceAnalyzer } = require('../runtime-resolver/src/interface-analyzer');
 const { WrapperGenerator } = require('../runtime-resolver/src/wrapper-generator');
 
-console.log('[Interface Wrapper] Loading interface-based wrapper for ${moduleName}');
+// This wrapper handles any module matching the pattern: ${moduleName}
+// The actual module name is determined at runtime from the Metro context
 
 const resolver = createRuntimeResolver({
   logging: true,
@@ -54,19 +56,23 @@ const resolver = createRuntimeResolver({
   fallbackStrategy: 'graceful'
 });
 
-let wrappedModule = {};
+// This function wraps any module that matches the pattern
+function wrapMatchingModule(actualModuleName) {
+  console.log('[Interface Wrapper] Loading interface-based wrapper for', actualModuleName);
+  
+  let wrappedModule = {};
 
-try {
-  // Try to require the original module
-  const originalModule = require('${moduleName}');
-  
-  // Wrap it with runtime resolver
-  wrappedModule = resolver.resolve('${moduleName}', originalModule);
-  
-  console.log('[Interface Wrapper] Successfully wrapped ${moduleName}');
-  
-} catch (error) {
-  console.warn('[Interface Wrapper] Failed to load ${moduleName}:', error.message);
+  try {
+    // Try to require the original module using the actual module name
+    const originalModule = require(actualModuleName);
+    
+    // Wrap it with runtime resolver
+    wrappedModule = resolver.resolve(actualModuleName, originalModule);
+    
+    console.log('[Interface Wrapper] Successfully wrapped', actualModuleName);
+    
+  } catch (error) {
+    console.warn('[Interface Wrapper] Failed to load', actualModuleName, ':', error.message);
   
   // Use interface analysis to create intelligent fallbacks
   const analyzer = new InterfaceAnalyzer();
@@ -140,15 +146,76 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       ? originalResolver(context, moduleName, platform)
       : context.resolveRequest(context, moduleName, platform);
     
-    // Check if this is a web platform and module needs wrapping
-    const needsWrapping = isWebPlatform && AUTO_WRAP_MODULES.includes(moduleName);
+    // Check if this is a web platform and module needs wrapping (using pattern matching)
+    const needsWrapping = isWebPlatform && AUTO_WRAP_MODULES.some(pattern => 
+      moduleName.startsWith(pattern) || moduleName.includes(pattern)
+    );
     
     if (needsWrapping) {
       console.log(`[Metro Config] Wrapping ${moduleName} for ${platform}`);
       
-      // Use pre-created wrapper file
+      // Find the matching pattern to determine the base module name
+      const matchingPattern = AUTO_WRAP_MODULES.find(pattern => 
+        moduleName.startsWith(pattern) || moduleName.includes(pattern)
+      );
+      
+      // Create a dynamic wrapper file for this specific module
       const safeName = moduleName.replace(/[^a-zA-Z0-9]/g, '_');
       const wrapperPath = path.join(wrapperDir, `${safeName}.js`);
+      
+      // Create wrapper content for this specific module
+      const wrapperContent = `
+// Auto-generated runtime wrapper for ${moduleName}
+const { createRuntimeResolver } = require('../runtime-resolver/src/index');
+const { InterfaceAnalyzer } = require('../runtime-resolver/src/interface-analyzer');
+const { WrapperGenerator } = require('../runtime-resolver/src/wrapper-generator');
+
+console.log('[Interface Wrapper] Loading wrapper for ${moduleName}');
+
+const resolver = createRuntimeResolver({
+  logging: true,
+  logLevel: 'warn',
+  fallbackStrategy: 'graceful'
+});
+
+let wrappedModule = {};
+
+try {
+  const originalModule = require('${moduleName}');
+  wrappedModule = resolver.resolve('${moduleName}', originalModule);
+  console.log('[Interface Wrapper] Successfully wrapped ${moduleName}');
+} catch (error) {
+  console.warn('[Interface Wrapper] Failed to load ${moduleName}:', error.message);
+  
+  const analyzer = new InterfaceAnalyzer();
+  const generator = new WrapperGenerator({
+    info: (msg) => console.log('[Interface Wrapper]', msg),
+    warn: (msg) => console.warn('[Interface Wrapper]', msg)
+  });
+  
+  try {
+    if (typeof process !== 'undefined' && process.platform) {
+      const moduleInterface = analyzer.analyzeModuleInterface('${moduleName}', process.cwd());
+      const interfaceWrapper = generator.generateWrapper(moduleInterface);
+      console.log('[Interface Wrapper] Generated interface-based wrapper for ${moduleName}');
+      wrappedModule = resolver.resolve('${moduleName}', interfaceWrapper);
+    } else {
+      console.log('[Interface Wrapper] Web environment - using basic fallback for ${moduleName}');
+      wrappedModule = resolver.resolve('${moduleName}', {});
+    }
+  } catch (analysisError) {
+    console.warn('[Interface Wrapper] Interface analysis failed:', analysisError.message);
+    wrappedModule = resolver.resolve('${moduleName}', {});
+  }
+}
+
+module.exports = wrappedModule;
+`;
+      
+      // Write the wrapper file if it doesn't exist
+      if (!fs.existsSync(wrapperPath)) {
+        fs.writeFileSync(wrapperPath, wrapperContent, 'utf8');
+      }
       
       return {
         ...resolution,
